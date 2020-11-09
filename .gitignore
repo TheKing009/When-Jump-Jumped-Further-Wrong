@@ -1,5 +1,6 @@
 /.internal
 /build
+/.vscode
 .externalToolBuilders
 .DS_Store
 Thumbs.db
