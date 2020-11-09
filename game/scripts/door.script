@@ -1,0 +1,39 @@
+local constants = require "game.modules.constants"
+local player_data = require "game.modules.player_data"
+local gamestate = require "game.modules.gamestate"
+
+go.property("next_level_index" , 1);
+go.property("activated", false)
+
+local function change_state(self, state)
+	if self.state ~= state then
+		self.state = state
+		sprite.play_flipbook("#sprite", hash("door_"..state))
+	end
+end
+
+function init(self)
+	change_state(self, "close")
+end
+
+function update(self, dt)
+	if self.activated then
+		change_state(self, "open")
+	end
+end
+
+function on_message(self, message_id, message, sender)
+	if message_id == constants.TRIGGER_RESPONSE then
+		if message.group == constants.PLAYER then
+			if message.enter and self.activated then
+				gamestate.set("PAUSE")
+				player_data.COMPLETED_LEVELS = player_data.COMPLETED_LEVELS + 1
+				if player_data.COMPLETED_LEVELS >= 5 then
+					msg.post("controller:/controller#controller", "load_scene", {scene = "won"})
+				else
+					msg.post("controller:/controller#controller", "load_scene", {scene = "weapon_shop"})
+				end
+			end
+		end
+	end
+end

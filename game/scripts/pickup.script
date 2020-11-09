@@ -1,0 +1,5 @@
+go.property("type", hash("medikit"));
+
+function init(self)
+	sprite.play_flipbook("#sprite", self.type);
+end

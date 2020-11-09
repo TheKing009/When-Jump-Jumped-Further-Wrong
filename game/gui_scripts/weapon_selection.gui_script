@@ -1,0 +1,5 @@
+local gamestate = require "game.modules.gamestate"
+
+function init(self)
+	gamestate.set("PLAY")
+end

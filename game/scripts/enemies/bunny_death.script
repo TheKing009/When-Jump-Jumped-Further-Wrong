@@ -1,0 +1,13 @@
+local constants = require "game.modules.constants"
+
+go.property("max_new_slimes", 5)
+go.property("min_new_slimes", 3)
+
+function on_message(self, message_id, message, sender)
+    if message_id == constants.ENEMY_DEATH then
+        local number = math.random(self.min_new_slimes, self.max_new_slimes)
+        for i = 1, number do
+            collectionfactory.create("/game#bunny_kid_factory", go.get_position(), vmath.quat_rotation_z(0), {})
+        end
+    end
+end

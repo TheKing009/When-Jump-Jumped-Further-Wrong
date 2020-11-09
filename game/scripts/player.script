@@ -1,0 +1,354 @@
+local constants = require "game.modules.constants"
+local input = require "game.modules.input"
+local game_settings = require "game.modules.game_settings"
+local camera = require "orthographic.camera"
+local utilities = require "game.modules.utilities"
+local weapons = require "game.modules.weapons"
+local player_data = require "game.modules.player_data"
+local gamestate = require "game.modules.gamestate"
+local sounds = require "game.modules.sounds"
+
+go.property("speed", 100);
+go.property("max_health", 3);
+go.property("shuffle", false);
+go.property("crosshair", false)
+
+local INPUT_MAP = {}
+
+local NAME = "mask"
+local CAMERAID = hash("/camera")
+
+local MEDIKIT = hash("medikit")
+
+local function fire(angle, properties, bullet_per_shot)
+	sounds.fire(1)
+	angle = angle * vmath.quat_rotation_z(math.rad(-90))
+	local scale = vmath.vector3(0.5)
+	local offset = vmath.rotate(angle, vmath.vector3(0, 15, 0))
+	if bullet_per_shot == 1 then
+		factory.create("/game#bullet_factory", go.get_world_position("weapon") + offset, angle, properties, scale);
+	else
+		local remainder = bullet_per_shot % 2
+		local range = math.floor(bullet_per_shot / 2)
+		if remainder == 1 then
+			for i = -range, range do
+				factory.create("/game#bullet_factory", go.get_world_position("weapon") + offset, angle * vmath.quat_rotation_z(math.rad(i * 20)), properties, scale);
+			end
+		else
+			range = bullet_per_shot - 1
+			for i = -range, range, -1 do
+				factory.create("/game#bullet_factory", go.get_world_position("weapon") + offset, angle * vmath.quat_rotation_z(math.rad(i/2 * 20)), properties, scale);
+			end
+		end
+	end
+end
+
+local function init_input()
+	if game_settings.input_type == constants.WASD then
+		INPUT_MAP.up = constants.W;
+		INPUT_MAP.down = constants.S;
+		INPUT_MAP.left = constants.A;
+		INPUT_MAP.right = constants.D;
+	else
+		INPUT_MAP.up = constants.UP;
+		INPUT_MAP.down = constants.DOWN;
+		INPUT_MAP.left = constants.LEFT;
+		INPUT_MAP.right = constants.RIGHT;
+	end
+end
+
+local function shuffle_inputs()
+	local temp = {}
+	if game_settings.input_type == constants.WASD then
+		temp = { constants.W, constants.A, constants.S, constants.D }
+	else
+		temp = { constants.UP, constants.DOWN, constants.LEFT, constants.RIGHT }
+	end
+
+	local index = math.random(1, #temp)
+	INPUT_MAP.up = temp [index]
+	table.remove(temp, index);
+
+	index = math.random(1, #temp)
+	INPUT_MAP.down = temp [index];
+	table.remove(temp, index);
+
+	index = math.random(1, #temp);
+	INPUT_MAP.left = temp [index];
+	table.remove(temp, index);
+
+	INPUT_MAP.right = temp[1];
+	temp = {}
+
+	msg.post("/gui#hud", "update_keys", {input_map = INPUT_MAP})
+	print(INPUT_MAP.up, INPUT_MAP.left, INPUT_MAP.right, INPUT_MAP.down);
+end
+
+local function change_state(self, next_state, force, on_complete)
+	if self.state ~= next_state or force then
+		self.state = next_state;
+		sprite.play_flipbook("#sprite", NAME.."_"..next_state, on_complete);
+	end
+end
+
+local function flip (right)
+	if right then
+		go.set_rotation(vmath.quat_rotation_y(math.rad(0)));
+	else
+		go.set_rotation(vmath.quat_rotation_y(math.rad(180)))
+	end
+
+	local position = go.get_position("weapon");
+	position.z = right and -math.abs(position.z) or math.abs(position.z);
+	go.set_position(position, "weapon");
+end
+
+local function die(self)
+	change_state(self, constants.DIE);
+	sprite.set_hflip("#sprite", false);
+	go.animate(".", "euler.z", go.PLAYBACK_ONCE_FORWARD, 90, go.EASING_INOUTBOUNCE, 0.25, 0, function()
+		msg.post("controller:/controller#controller", "load_scene", {scene = "fail"})
+	end)
+	self.dead = true;
+end
+
+local function take_damage(self, damage)
+	if self.dead then
+		return
+	end
+	sounds.hit()
+	self.health = self.health - damage;
+	self.health = math.max(self.health, 0);
+	msg.post("/gui#hud", "update_health", {health = self.health})
+	if self.health == 0 then
+		die(self)
+	else
+		change_state(self, constants.HIT, false, function()
+			change_state(self, constants.IDLE)
+		end)
+	end
+end
+
+local function change_weapon(self, index)
+	self.weapon = weapons[index]
+	self.weapon_angle = vmath.quat();
+	self.fire_rate = 1/self.weapon.bullets_per_second;
+	self.bullets_left = self.weapon.magazine_size;
+	self.time_till_next_bullet = self.fire_rate;
+	msg.post("laser", self.weapon.laser_sight and "enable" or "disable")
+	sprite.play_flipbook("weapon#sprite", hash(self.weapon.name))
+end
+
+local function init_char()
+	if player_data.NAME ~= "" then
+		NAME = player_data.NAME
+	end
+end
+
+local function fall(self)
+	self.dead = true
+	change_state(self, "die")
+	go.set(".", "position.z", -0.9)
+	local position = go.get_position()
+	go.animate(".", "position.y", go.PLAYBACK_ONCE_FORWARD, position.y - 100, go.EASING_LINEAR, 2, 0, function()
+		player_data.DEATH_BY_FALL = true;
+		msg.post("controller:/controller#controller", "load_scene", {scene = "fail"})
+	end)
+	go.animate("#sprite", "tint.w", go.PLAYBACK_ONCE_FORWARD, 0, go.EASING_LINEAR, 2)
+end
+
+function init(self)
+	input.acquire();
+	init_input();
+	init_char();
+	math.randomseed(socket.gettime());
+	change_state(self, constants.IDLE);
+	change_weapon(self, player_data.WEAPON);
+
+	self.velocity = vmath.vector3();
+	self.correction = vmath.vector3();
+	self.facing_right = true;
+	self.health = self.max_health;
+	self.rolling = false
+	self.crosshair_position = vmath.vector3()
+
+	msg.post("/gui#hud", "update_health", {health = self.health})
+	msg.post("/gui#hud", "update_keys", {input_map = INPUT_MAP})
+	timer.delay(constants.IN_GAME_SEC, true, function()
+		if self.shuffle and gamestate.get() == "PLAY" then
+			sounds.change_keys(function()
+				player_data.SECONDS = player_data.SECONDS + 1;
+				shuffle_inputs()
+				msg.post("/gui#hud", "seconds", {seconds = player_data.SECONDS})
+			end)
+		end
+	end)
+end
+
+function final(self)
+	input.release();
+end
+
+function update(self, dt)
+	if self.dead or (gamestate.get() ~= "PLAY") then
+		return;
+	end
+	
+	self.correction = vmath.vector3();
+	self.velocity = vmath.vector3();
+
+	if self.crosshair then
+		go.set_position(self.crosshair_position, "/crosshair")
+	end
+
+	if self.state == constants.HIT then 
+		return
+	end
+
+	if (not input.is_pressed(constants.FIRE)) or self.reloading or self.weapon.move_and_fire then
+		if input.is_pressed(INPUT_MAP.up) then
+			self.velocity.y = self.speed;
+		elseif input.is_pressed(INPUT_MAP.down) then
+			self.velocity.y = -self.speed;
+		end
+
+		if input.is_pressed(INPUT_MAP.left) then
+			self.velocity.x = -self.speed;
+		elseif input.is_pressed(INPUT_MAP.right) then
+			self.velocity.x = self.speed;
+		end
+
+		if self.state ~= constants.ROLL then
+			if vmath.length_sqr(self.velocity) > 0.01 then
+				self.velocity = vmath.normalize(self.velocity);
+				self.velocity = self.velocity * self.speed;
+				change_state(self, constants.RUN);	
+			else
+				change_state(self, constants.IDLE);
+			end
+		else
+			self.velocity = vmath.rotate(self.roll_angle, constants.NORTH) * self.speed
+		end
+
+		local position = go.get_position();
+		position = position + self.velocity * dt;
+		go.set_position(position);
+	end
+
+	if input.is_pressed(constants.FIRE_BUTTON) then
+		if self.time_till_next_bullet <= 0 then
+			local properties = {}
+			local bullet_per_shot = self.weapon.bullet_per_shot or 1
+			properties.speed = self.weapon.speed;
+			properties.type = self.weapon.type
+			properties.distance = self.weapon.distance
+			properties.damage = self.weapon.damage
+			fire(go.get_world_rotation("weapon"), properties, bullet_per_shot);
+			self.time_till_next_bullet = self.fire_rate;
+		end
+	end
+
+	self.time_till_next_bullet = self.time_till_next_bullet - dt
+end
+
+function on_message(self, message_id, message, sender)
+	if message_id == hash("contact_point_response") and message.group == hash("wall")then
+		if message.distance > 0 then
+			-- First, project the accumulated correction onto
+			-- the penetration vector
+			local proj = vmath.project(self.correction, message.normal * message.distance)
+			if proj < 1 then
+				-- Only care for projections that does not overshoot.
+				local comp = (message.distance - message.distance * proj) * message.normal
+				-- Apply compensation
+				go.set_position(go.get_position() + comp)
+				-- Accumulate correction done
+				self.correction = self.correction + comp
+			end
+		end
+	end
+
+	
+	if message_id == constants.COLLISION_RESPONSE then
+		if message.group == constants.BULLET and self.state ~= constants.ROLL then
+			local damage = go.get(msg.url(nil, message.other_id, "bullet"), "damage");
+			take_damage(self, damage)
+		elseif message.group == constants.PICKUPS then
+			local type = go.get(msg.url(nil, message.other_id, "pickup"), "type");
+			if type == MEDIKIT then
+				self.health = self.max_health
+				msg.post("/gui#hud", "update_health", {health = self.health})
+				go.delete(message.other_id)
+				factory.create("#appear_factory",go.get_position(message.other_id), nil, {anim = "collected", a = false})
+			end
+		end
+	elseif message_id == constants.ENABLE then
+		input.acquire()
+		NAME = player_data.NAME
+		change_state(self, constants.IDLE, true)
+		msg.post("weapon", "enable");
+		msg.post("laser", self.weapon.laser_sight and "enable" or "disable")
+		init_input()
+	elseif message_id == constants.DISABLE then
+		input.release()
+		msg.post("weapon", "disable");
+		msg.post("laser", "disable")
+	elseif message_id == constants.TRIGGER_RESPONSE then
+		if message.group == hash("wall") or message.group == hash("floor") then
+			if message.enter then
+				self.entered = true
+			else
+				if self.entered then
+					--fall(self)
+				end
+			end
+		end
+	elseif message_id == hash("change_weapon") then
+		change_weapon(self, message.index)
+	end
+end
+
+function on_input(self, action_id, action)
+	if (self.dead) then return end
+	
+	input.on_input(action_id, action);
+
+	if not action_id then
+		local camera_pos = camera.screen_to_world(CAMERAID, vmath.vector3(action.x, action.y, 0));
+		local pos = go.get_world_position();
+		local diff = camera_pos - pos;
+		local angle = -math.atan2(diff.x, diff.y);
+
+		self.crosshair_position = camera_pos
+
+		local rotation = go.get("/player/weapon", "euler");
+		rotation.z = math.deg(angle) + 90;
+		self.fire_angle = rotation;
+		if rotation.z < 90 and rotation.z > -90 then
+			flip(true)
+		else
+			flip(false)
+			rotation.z = 180 - rotation.z
+		end
+
+		go.set("laser#laser", "target", camera_pos);
+		go.set("laser#laser", "angle", go.get_world_rotation("weapon") * vmath.quat_rotation_z(-90))
+		go.set("/player/weapon", "euler", rotation);
+	elseif action_id == constants.ROLL_BUTTON and action.released then
+		if self.state ~= constants.ROLL then
+			local camera_pos = camera.screen_to_world(CAMERAID, vmath.vector3(action.x, action.y, 0));
+			local pos = go.get_world_position();
+			local diff = camera_pos - pos;
+			local angle = -math.atan2(diff.x, diff.y);
+			
+			self.roll_angle = vmath.quat_rotation_z(angle)
+			
+			self.speed = self.speed * 1.5
+			self.velocity = vmath.rotate(self.roll_angle, constants.NORTH) * self.speed
+			change_state(self, constants.ROLL, false, function()
+				self.speed  = self.speed / 1.5
+				change_state(self, constants.IDLE)
+			end)
+		end
+	end
+end

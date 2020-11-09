@@ -1,0 +1,90 @@
+local input =  require "game.modules.input"
+local constants =  require "game.modules.constants"
+local player_data =  require "game.modules.player_data"
+local camera = require "orthographic.camera"
+local gamestate = require "game.modules.gamestate"
+
+local CHARS = {"mask", "tech", "frog"}
+
+go.property("index", 1)
+go.property("zoom", 2)
+
+function init(self)
+	input.acquire()
+	self.animating = false;
+	msg.post("/player/player", "disable")
+	sprite.play_flipbook("#sprite", hash(CHARS[self.index].."_idle"))
+	msg.post("#label", "disable")
+	msg.post("#label1", "disable")
+	msg.post("/menu#menu", "register", {id = go.get_id()})
+end
+
+function final(self)
+	input.release()
+end
+
+function update(self, dt)
+	if player_data.NAME ~= "" and self.zoom ~= 1 then
+		--camera.set_zoom(hash("/camera"), self.zoom)
+	end
+end
+
+function on_message(self, message_id, message, sender)
+	if message_id == constants.enable then
+		msg.post("#label", "enable")
+		msg.post("#label1", "enable")
+	end
+end
+
+function on_input(self, action_id, action)
+	if gamestate.get() ~= "PLAY" then
+		return
+	end
+
+	if player_data.NAME ~= "" then
+		return
+	end
+	
+	input.on_input(action_id, action)
+
+	if not action_id then
+		local position = go.get_position();
+		local scale = go.get_scale()
+		local size = go.get("#sprite", "size");
+		size.x = size.x * scale.z;
+		size.y = size.y * scale.y
+		local pos = go.get_position();
+		action.x = action.x - 960/2;
+		action.y = action.y - 540/2
+		
+		if (action.x / self.zoom) > (pos.x - size.x)  and (action.x / self.zoom) < (pos.x + size.x)  and (action.y / self.zoom) > (pos.y - size.y) and (action.y / self.zoom) <  (pos.y + size.y) then
+			self.entered = true
+			if not self.animating or self.scale ~= vmath.vector3(1.5) then
+				self.animating = true;
+				go.cancel_animations(".", "scale")
+				go.animate(".", "scale", go.PLAYBACK_ONCE_FORWARD, vmath.vector3(1.5), go.EASING_LINEAR, 1, 0, function()
+				end)
+			end
+		else
+			if self.animating then
+				go.cancel_animations(".", "scale");
+				self.animating = false
+				self.entered = false
+				go.animate(".", "scale", go.PLAYBACK_ONCE_FORWARD, vmath.vector3(1), go.EASING_LINEAR, 1, 0, function()
+				end)
+			end
+		end
+	end
+
+	if action_id == constants.FIRE_BUTTON and action.released then
+		if self.entered and player_data.NAME == "" then
+			print("clicked")
+			player_data.NAME = CHARS[self.index]
+			go.set_position(go.get_position(), "/player/player")
+			msg.post("/player/player", "enable")
+			msg.post(".", "disable")
+			msg.post("/menu#char_select", "disable")
+			go.delete()
+		end
+	end
+end

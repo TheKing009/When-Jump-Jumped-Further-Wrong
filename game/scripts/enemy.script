@@ -1,0 +1,156 @@
+local weapons = require "game.modules.weapons"
+local enemies = require "game.modules.enemies"
+local constants = require "game.modules.constants"
+local level_generator = require "game.modules.level_generator"
+local gamestate = require "game.modules.gamestate"
+local player_data = require "game.modules.player_data"
+
+go.property("index", 1)
+
+local RANGED = hash("ranged");
+local MELEE = hash("melee");
+
+local function fire(angle, properties, bullet_per_shot)
+	local offset = vmath.rotate(angle, vmath.vector3(0, 15, 0))
+	if bullet_per_shot == 1 then
+		factory.create("/game#bullet_factory", go.get_world_position() + vmath.vector3(0, 4, -0.1), angle, properties);
+	else
+		local remainder = bullet_per_shot % 2
+		local range = math.floor(bullet_per_shot / 2)
+		if remainder == 1 then
+			for i = -range, range do
+				factory.create("/game#bullet_factory", go.get_world_position() + vmath.vector3(0, 4, -0.1), angle, properties);
+			end
+		else
+			range = bullet_per_shot - 1
+			for i = -range, range, -1 do
+				factory.create("/game#bullet_factory", go.get_world_position() + vmath.vector3(0, 4, -0.1), angle, properties);
+			end
+		end
+	end
+end
+
+local function init_enemy(self)
+	self.speed = enemies[self.index].speed;
+	self.max_health = enemies[self.index].max_health;
+	self.health = enemies[self.index].max_health;
+	self.type = enemies[self.index].type;
+	self.name = enemies[self.index].name;
+
+	if self.type == RANGED then
+		local weapon_index = enemies[self.index].weapon;
+		self.weapon = weapons[weapon_index];
+		self.fire_rate = 1/(self.weapon.bullets_per_second/10);
+		self.time_till_next_bullet = self.fire_rate;
+		--sprite.play_flipbook("weapon#sprite", hash(""))
+	end
+end
+
+local function change_state(self, next_state)
+	if self.state ~= next_state then
+		self.state = next_state;
+		sprite.play_flipbook("#sprite", self.name.."_"..next_state);
+	end
+end
+
+local function die(self)
+	if self.dead then
+		return
+	end
+	self.dead = true;
+	change_state(self, constants.DIE);
+	sprite.set_hflip("#sprite", false);
+	go.animate(".", "euler.z", go.PLAYBACK_ONCE_FORWARD, 90, go.EASING_LINEAR, 0.5, 0, function()
+		go.animate("#sprite", "tint.w", go.PLAYBACK_ONCE_FORWARD, 0, go.EASING_LINEAR, 0.5, 0, function()
+			go.delete();
+			msg.post("/game#game", "enemy_death")
+		end)
+	end)
+end
+
+local function take_damage(self, damage)
+	self.health = self.health - damage;
+	self.health = math.max(self.health, 0);
+	if self.health == 0 and not self.dead then
+		die(self)
+	end
+end
+
+function init(self)
+	self.index = math.random(1, player_data.COMPLETED_LEVELS + 1)
+	init_enemy(self)
+	change_state(self, constants.IDLE)
+end
+
+function final(self)
+	-- Add finalization code here
+	-- Learn more: https://defold.com/manuals/script/
+	-- Remove this function if not needed
+end
+
+function update(self, dt)
+	if self.dead then return end
+	if gamestate.get() ~= "PLAY" then
+		return	
+	end
+
+	if (gamestate.get() == "PLAY") and (self.target == nil) then
+		self.targets = level_generator.return_nearby_tiles(go.get_position())
+		if #self.targets > 0 then
+			self.target = self.targets[math.random(1, #self.targets)] * 16 - vmath.vector3(8, 8, 0)
+		end
+	end
+
+	local position = go.get_position();
+	if self.target ~= nil then
+		local diff = self.target - position;
+		local angle = -math.atan2(diff.x, diff.y);
+		local quat = vmath.quat_rotation_z(angle)
+		
+
+		local direction = vmath.rotate(quat, constants.NORTH)
+		direction = vmath.normalize(direction);
+		position = position + self.speed * direction * dt
+		go.set_position(position)
+
+		if vmath.length_sqr(diff) < 10 then
+			self.targets = level_generator.return_nearby_tiles(position)
+			if #self.targets > 0 then
+				self.target = self.targets[math.random(1, #self.targets)] * 16 - vmath.vector3(8, 8, 0)
+			else
+				self.target = nil
+			end
+		end
+	end
+	
+	local distance = self.weapon.distance or 500;
+	local player_position = go.get_position("/player/player")
+	local diff = player_position - position;
+	local angle = -math.atan2(diff.x, diff.y);
+	local quat = vmath.quat_rotation_z(angle)
+
+	if self.type == RANGED then
+		if vmath.length_sqr(diff) < (distance ^ 2) / 16 then
+			if self.time_till_next_bullet <= 0 then
+				local properties = {}
+				properties.speed = self.weapon.speed;
+				properties.enemy_bullet = true;
+				fire(quat, properties, self.weapon.bullet_per_shot);
+				self.time_till_next_bullet = self.fire_rate;
+			end
+		end
+
+		self.time_till_next_bullet = self.time_till_next_bullet - dt;
+	end
+end
+
+function on_message(self, message_id, message, sender)
+	if self.dead then return end
+	
+	if message_id == constants.COLLISION_RESPONSE then
+		if message.group == constants.BULLET then
+			local damage = go.get(msg.url(nil, message.other_id, "bullet"), "damage");
+			take_damage(self, damage)
+		end
+	end
+end

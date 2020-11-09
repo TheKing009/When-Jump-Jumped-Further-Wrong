@@ -1,0 +1,25 @@
+local constants = require "game.modules.constants"
+local gamestate = require "game.modules.gamestate"
+local player_data = require "game.modules.player_data"
+
+local LEVELS = {
+	"game", "menu", "credits", "weapon_shop", "intro1"
+}
+
+go.property("next_level_index" , 1);
+
+function on_message(self, message_id, message, sender)
+	if self.next_level_index == 5 then
+		if player_data.INTRO_PLAYED then
+			self.next_level_index = 4
+		end
+	end
+	if message_id == constants.TRIGGER_RESPONSE then
+		if message.group == constants.PLAYER then
+			if message.enter then
+				gamestate.set("PAUSE")
+				msg.post("controller:/controller#controller", "load_scene", {scene = LEVELS[self.next_level_index]})
+			end
+		end
+	end
+end

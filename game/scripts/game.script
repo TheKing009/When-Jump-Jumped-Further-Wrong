@@ -1,0 +1,114 @@
+local level_generator = require "game.modules.level_generator"
+local light_dungeons = require "game.modules.light_dungeons"
+local player_data = require "game.modules.player_data"
+local gamestate = require "game.modules.gamestate"
+local level_decorator = require "game.modules.level_decorator"
+local constants = require "game.modules.constants"
+local enemies = require "game.modules.enemies"
+local camera = require "orthographic.camera"
+
+go.property("zoom", 0.4)
+
+local CAMERAID = hash("/camera")
+
+local function spawn_enemy(self, position)
+	local index = math.random(1, 2 + player_data.COMPLETED_LEVELS)
+	local name = enemies[index]
+	print("#"..name.."_factory")
+	collectionfactory.create("#"..name.."_factory", position)
+end
+
+local function appear_anim(self)
+	local position = (level_generator.return_random_floor() - vmath.vector3(1, 1, 0)) * 32 + vmath.vector3(16, 16, 0)
+	factory.create("#appear_factory", position)
+	self.appeared = self.appeared + 1
+end
+
+local function zoom_onto_player(self)
+	msg.post("/player/player", "enable")
+	msg.post("/gui#loading", "disable")
+	self.animating = true
+	camera.follow(CAMERAID, "/player/player", {
+		lerp = 0.1,
+	})
+	go.animate("#", "zoom", go.PLAYBACK_ONCE_FORWARD, 2, go.EASING_LINEAR, 2, 0, function()
+		self.animating = false
+		msg.post("/gui#hud", "enable")
+		gamestate.set("PLAY")
+	end)
+end
+
+local function on_level_generated(self)
+	self.init_enemies = 10 + player_data.COMPLETED_LEVELS
+	for i = 1, self.init_enemies do
+		appear_anim(self)
+	end
+
+	local turret = level_generator.return_turret_position()
+	if turret then
+		local turret_pos = (turret.position - vmath.vector3(1, 1, 0)) * 32 + vmath.vector3(16, 16, 0);
+		collectionfactory.create("#turret_factory", turret_pos, vmath.quat_rotation_y(turret.left and 0 or math.pi))
+	end
+	
+	local player_position = level_generator.PLAYER_POSITION;
+	if player_position then
+		go.set_position(player_position * 32, "/player/player")
+	else
+		go.set_position((level_generator.return_random_floor() + vmath.vector3(1, 1, 0)) * 32 + vmath.vector3(16, 16, 0), "/player/player")
+	end
+
+	local door_position = level_generator.return_door_position()
+	go.set_position(door_position * 32 - vmath.vector3(16, 0, 0), "/door")
+	msg.post("/door", "enable")
+end
+
+function init(self)
+	self.enemies = 0;
+	self.appeared = 0
+	msg.post("/player/player", "disable")
+	msg.post("/door", "disable")
+	msg.post("/gui#hud", "disable")
+	gamestate.set("PAUSE")
+	level_generator.generate("/map#procgen", function(url, grid)
+		level_decorator.decorate(url, grid, function()
+			on_level_generated(self)
+		end)
+	end);
+end
+
+
+function update(self, dt)
+	if self.animating then
+		camera.set_zoom(CAMERAID, self.zoom)
+	end
+end
+
+function on_message(self, message_id, message, sender)
+	if message_id == constants.ENEMY_DEATH then
+		self.enemies = self.enemies - 1
+		if math.random() < 0.15 then
+			factory.create("#pickup", go.get_position(sender), nil, {}, vmath.vector3(0.5))
+		end
+		if self.enemies <= 0 then
+			go.set("/door#door", "activated", true)
+			msg.post("/gui#hud", "change_mission")
+		end
+	elseif message_id == constants.REGISTER_ENEMY then
+		self.enemies = self.enemies + 1
+	elseif message_id == hash("spawn_enemy") then
+		spawn_enemy(self, message.position)
+		self.appeared = self.appeared - 1
+		self.appeared = math.max(0, self.appeared)
+		if self.appeared == 0 then
+			timer.delay(0.5, false, function()
+				zoom_onto_player(self)
+			end)
+		end	
+	end
+end
+
+
+function on_reload(self)
+	msg.post("controller:/controller#controller", "load_scene", {scene = "game"})
+	
+end

@@ -1,0 +1,48 @@
+local input = require "game.modules.input"
+local weapon = require "game.modules.weapons"
+local player_data = require "game.modules.player_data"
+
+go.property("index", 1)
+
+function init(self)
+	input.acquire()
+	self.index = (player_data.COMPLETED_LEVELS+1) * 2 - self.index
+	sprite.play_flipbook("#sprite", weapon[self.index].name)
+	label.set_text("#name", weapon[self.index].name)
+	label.set_text("#desc", weapon[self.index].Description)
+	msg.post("#info", "disable")
+end
+
+function final(self)
+	input.release()
+end
+
+function update(self, dt)
+	if self.entered then 
+		msg.post("#info", "enable")
+		if input.is_pressed(hash("key_e")) then
+			player_data.WEAPON = self.index
+			msg.post("/player/player", "change_weapon", {index = self.index})
+		end
+	end
+end
+
+function on_message(self, message_id, message, sender)
+	if message_id == hash("trigger_response") then
+		if message.enter then
+			self.entered = true
+		else
+			self.entered = false
+		end
+	end
+end
+
+function on_input(self, action_id, action)
+	input.on_input(action_id, action)
+end
+
+function on_reload(self)
+	-- Add reload-handling code here
+	-- Learn more: https://defold.com/manuals/hot-reload/
+	-- Remove this function if not needed
+end

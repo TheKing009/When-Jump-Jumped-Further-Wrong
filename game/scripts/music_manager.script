@@ -1,0 +1,56 @@
+go.property("gain", 1)
+
+local PLAY_SPECIFIC = hash("play_specific")
+
+local MUSICS = 
+{
+	"theme-1", "theme-2", "theme-3", "theme-4", "theme-5", "theme-6", "theme-7"
+}
+
+local function play_music(self, index)
+	sound.stop("#"..MUSICS[self.index])
+	self.index = index or math.random(1, #MUSICS)
+	sound.play("#"..MUSICS[self.index], {gain  = 0.5})
+	timer.delay(60, false, function()
+		self.animating = true
+		go.animate("#", "gain", go.PLAYBACK_ONCE_FORWARD, 0, go.EASING_LINEAR, 0.5, 0, function()
+			go.animate("#", "gain", go.PLAYBACK_ONCE_FORWARD, 0.5, go.EASING_LINEAR, 0.5, 0, function()
+				if not index then
+					self.animating = false
+					play_music(self)
+				end
+			end)
+		end)
+	end)
+end
+
+function init(self)
+	self.index = 1
+	self.animating = false
+	play_music(self)
+end
+
+function final(self)
+	sound.stop(MUSICS[self.index])
+end
+
+function update(self, dt)
+	if self.animating then
+		sound.set_group_gain("music", self.gain)
+	end
+end
+
+function on_message(self, message_id, message, sender)
+	if message_id == PLAY_SPECIFIC then
+		if message.music then
+			for k, v in pairs(MUSICS) do
+				if v == message.music then
+					play_music(self, k)
+					break;
+				end
+			end
+		else
+			play_music(self)
+		end
+	end
+end

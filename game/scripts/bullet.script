@@ -1,0 +1,48 @@
+local constants = require "game.modules.constants"
+
+go.property("speed", 200);
+go.property("type", hash("bullet-1"));
+go.property("enemy_bullet", false);
+go.property("damage", 1);
+go.property("distance", 500);
+go.property("explosion", hash(""));
+
+local EMPTY_HASH = hash("");
+
+local function destroy_bullet(self)
+	go.delete();
+	if self.explosion ~= EMPTY_HASH then
+	end
+end
+
+function init(self)
+	sprite.play_flipbook("#sprite", self.type);
+	if self.enemy_bullet then
+		msg.post("#enemy_collision", "disable")
+	else
+		msg.post("#player_collision", "disable")
+	end
+
+	self.initial_position = go.get_position();
+end
+
+function update(self, dt)
+	local position = go.get_position();
+	local d = vmath.rotate(go.get_rotation(), constants.NORTH);
+	position = position + d * self.speed * dt;
+	go.set_position(position);
+
+	if vmath.length_sqr(position - self.initial_position) > self.distance ^ 2 then
+		destroy_bullet(self)
+	end
+end
+
+function on_message(self, message_id, message, sender)
+	if message_id == constants.COLLISION_RESPONSE then
+		if message.group == constants.WALL then
+			destroy_bullet(self)
+		elseif message.group == constants.PLAYER or message.group == constants.ENEMY then
+			destroy_bullet(self)
+		end
+	end
+end

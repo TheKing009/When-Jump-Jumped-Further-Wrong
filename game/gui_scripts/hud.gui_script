@@ -1,0 +1,108 @@
+local game_settings = require "game.modules.game_settings"
+local constants = require "game.modules.constants"
+local player_data = require "game.modules.player_data"
+local weapons = require "game.modules.weapons"
+
+local left = vmath.vector3(-85, -228, 0)
+local down = vmath.vector3(0, -228, 0)
+local right = vmath.vector3(85, -228, 0)
+local up = vmath.vector3(0, -149, 0)
+
+local function set_health(self, health)
+	if health <=3 then
+		for i = 1, 3 do
+			gui.set_enabled(gui.get_node("heart_"..i), false)
+		end
+
+		for i = 1, health do
+			gui.set_enabled(gui.get_node("heart_"..i), true)
+		end
+	end
+end
+
+local function set_key_wasd(node, key, super)
+	local text = "W"
+	if key == constants.W then
+		text = "W"
+		gui.animate(super, "position", up, gui.EASING_OUTBOUNCE, 0.5)
+	elseif key == constants.A then
+		text = "A"
+		gui.animate(super, "position", left, gui.EASING_OUTBOUNCE, 0.5)
+	elseif key == constants.S then
+		text = "S"
+		gui.animate(super, "position", right, gui.EASING_OUTBOUNCE, 0.5)
+	elseif key == constants.D then
+		text = "D"
+		gui.animate(super, "position", down, gui.EASING_OUTBOUNCE, 0.5)
+	end
+	gui.set_scale(node, vmath.vector3(0.75))
+	--gui.set_text(node, text)
+end
+
+local function set_key_arrows(node, key)
+	local text = "Up"
+	if key == constants.UP then
+		text = "Up"
+	elseif key == constants.DOWN then
+		text = "Down"
+	elseif key == constants.LEFT then
+		text = "Left"
+	elseif key == constants.RIGHT then
+		text = "Right"
+	end
+	gui.set_scale(node, vmath.vector3(0.5))
+	gui.set_text(node, text)
+end
+
+
+function init(self)
+	gui.set_text(gui.get_node("weapon_name"), weapons[player_data.WEAPON].name)
+end
+
+function final(self)
+	-- Add finalization code here
+	-- Learn more: https://defold.com/manuals/script/
+	-- Remove this function if not needed
+end
+
+function update(self, dt)
+	-- Add update code here
+	-- Learn more: https://defold.com/manuals/script/
+	-- Remove this function if not needed
+end
+
+function on_message(self, message_id, message, sender)
+	if message_id == hash("update_health") then
+		set_health(self, message.health)
+	elseif message_id == hash("update_keys") then
+		if game_settings.input_type == constants.WASD then
+			set_key_wasd(gui.get_node("key_left"), message.input_map.left, gui.get_node("left_box"))
+			set_key_wasd(gui.get_node("key_right"), message.input_map.right, gui.get_node("right_box"))
+			set_key_wasd(gui.get_node("key_up"), message.input_map.up, gui.get_node("up_box"))
+			set_key_wasd(gui.get_node("key_down"), message.input_map.down, gui.get_node("down_box"))
+		end
+	elseif message_id == hash("change_mission") then
+		gui.set_text(gui.get_node("mission"), "Seek the Door")
+	elseif message_id == hash("seconds") then
+		local s = tostring(message.seconds)
+		gui.set_text(gui.get_node("mission"), "Seconds : "..s)
+	end
+end
+
+function on_input(self, action_id, action)
+	-- Add input-handling code here. The game object this script is attached to
+	-- must have acquired input focus:
+	--
+	--    msg.post(".", "acquire_input_focus")
+	--
+	-- All mapped input bindings will be received. Mouse and touch input will
+	-- be received regardless of where on the screen it happened.
+	-- Learn more: https://defold.com/manuals/input/
+	-- Remove this function if not needed
+end
+
+function on_reload(self)
+	-- Add reload-handling code here
+	-- Learn more: https://defold.com/manuals/hot-reload/
+	-- Remove this function if not needed
+end

@@ -1,0 +1,25 @@
+local constants = require "game.modules.constants"
+
+go.property("bullets", 8)
+go.property("damage", 2)
+go.property("bullet_type", hash("bullet-5"))
+
+local function fire(angle, properties)
+    factory.create("/game#bullet_factory", go.get_world_position() + vmath.vector3(0, 4, -0.1), angle, properties);
+end
+
+function on_message(self, message_id, message, sender)
+    if message_id == constants.ENEMY_DEATH then
+        local angle_division = 360 / self.bullets
+        for i = 1, self.bullets do
+            local angle = angle_division * i;
+            angle = vmath.quat_rotation_z(math.rad(angle))
+            local properties = {}
+            properties.enemy_bullet = true;
+            properties.speed = 200;
+            properties.damage = self.damage;
+            properties.type = self.bullet_type
+            fire(angle, properties)
+        end
+    end
+end

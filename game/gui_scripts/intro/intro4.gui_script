@@ -1,0 +1,181 @@
+local camera = require "orthographic.camera"
+local input = require "game.modules.input"
+local constants = require "game.modules.constants"
+local sounds = require "game.modules.sounds"
+
+local CAMERAID = hash("/scene4_camera")
+
+local function print_text(self, text, shake, on_complete)
+	if (not self.completed) or (self.text == text) then
+		return
+	end
+	self.text = text
+	self.completed = false
+	local node = gui.get_node("text")
+	local position = vmath.vector3(480, -100, 0)
+	gui.animate(node, "position", vmath.vector3(480, -200, 0), go.EASING_INBACK, 1, 0, function()
+		gui.set_text(node, text)
+		camera.shake(CAMERAID, shake and 0.005 or 0, 2)
+		gui.animate(node, "position", vmath.vector3(480, 100, 0), go.EASING_OUTBACK, 1, 0, function()
+			self.completed = true
+			camera.stop_shaking(CAMERAID)
+
+			if on_complete then
+				on_complete()
+			end
+		end)
+	end)
+end
+
+
+local function ahh(self)
+	print_text(self, "Ahh !!!!", true)
+	
+	sounds.sinister_laugh(function()
+		msg.post("/animator", "start")
+	end)
+end
+
+local function wrong(self)
+	print_text(self, "What else could go wrong")
+	if self.completed then
+		if input.is_pressed(constants.FIRE_BUTTON) then
+			ahh(self)
+			self.current = ahh
+		end
+	end
+end
+
+local function complain(self)
+	print_text(self, "Time warp, Unmatching weapons, Built-for-a-jam prison", true)
+	if self.completed then
+		if input.is_pressed(constants.FIRE_BUTTON) then
+			self.current = wrong
+		end
+	end
+end
+
+local function present(self)
+	print_text(self, "Oh!!! The developer sent me a present", true, function()
+		msg.post("/pistol", "enable")
+	end)
+	if self.completed then
+		if input.is_pressed(constants.FIRE_BUTTON) then
+			self.current = complain
+		end
+	end
+end
+
+local function waitagain(self)
+	print_text(self, "Hey Wait Again!!! ", false)
+	if self.completed then
+		if input.is_pressed(constants.FIRE_BUTTON) then
+			self.current = present
+		end
+	end
+end
+
+local function manners(self)
+	print_text(self, "One second here = Five seconds of my world (Jump)", false)
+	if self.completed then
+		if input.is_pressed(constants.FIRE_BUTTON) then
+			self.current = waitagain
+		end
+	end
+end
+
+local function forgetting(self)
+	print_text(self, "But it's because the time runs differently here", false)
+	if self.completed then
+		if input.is_pressed(constants.FIRE_BUTTON) then
+			self.current = manners
+		end
+	end
+end
+
+local function wait(self)
+	print_text(self, "I dont know how long I have been here?", false)
+	if self.completed then
+		if input.is_pressed(constants.FIRE_BUTTON) then
+			self.current = forgetting
+		end
+	end
+end
+
+local function some_ones_here(self)
+	print_text(self, "He coded some sorta prison world and sent me into it", false)
+	if self.completed then
+		if input.is_pressed(constants.FIRE_BUTTON) then
+			self.current = wait
+		end
+	end
+end
+
+local function hello3(self)
+	print_text(self, "Called Himself the Developer", true, function()
+		camera.set_zoom(CAMERAID, 1.5)
+	end)
+	if self.completed then
+		if input.is_pressed(constants.FIRE_BUTTON) then
+			self.current = some_ones_here
+		end
+	end
+end
+
+local function hello2(self)
+	print_text(self, "I jumped on a weirdo", true, function()
+		camera.set_zoom(CAMERAID, 1)
+	end)
+	if self.completed then
+		if input.is_pressed(constants.FIRE_BUTTON) then
+			self.current = hello3
+		end
+	end
+end
+
+local function hello1(self)
+	print_text(self, "Until One Day", true)
+	if self.completed then
+		if input.is_pressed(constants.FIRE_BUTTON) then
+			self.current = hello2
+		end
+	end
+end
+
+function init(self)
+	input.acquire()
+	self.current = hello1
+	self.text = ""
+	self.completed = true
+	msg.post("/pistol", "disable")
+	
+	local node = gui.get_node("text")
+	local position = vmath.vector3(480, -98, 0)
+	gui.set_position(node, position)
+end
+
+function final(self)
+	input.release()
+end
+
+function update(self, dt)
+	if self.current ~= ahh then
+		self.current(self)
+	end
+end
+
+function on_message(self, message_id, message, sender)
+	-- Add message-handling code here
+	-- Learn more: https://defold.com/manuals/message-passing/
+	-- Remove this function if not needed
+end
+
+function on_input(self, action_id, action)
+	input.update(action_id, action)
+end
+
+function on_reload(self)
+	-- Add reload-handling code here
+	-- Learn more: https://defold.com/manuals/hot-reload/
+	-- Remove this function if not needed
+end

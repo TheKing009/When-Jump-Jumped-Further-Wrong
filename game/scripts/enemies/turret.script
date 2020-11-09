@@ -1,0 +1,107 @@
+local turrets = require "game.modules.enemies.turrets"
+local constants = require "game.modules.constants"
+local gamestate = require "game.modules.gamestate"
+
+go.property("facing_right", true);
+go.property("index", 1)
+go.property("offset", vmath.vector3())
+
+local function fire(self)
+	local angle = self.facing_right and 90 or -90
+	factory.create("/game#bullet_factory", go.get_position() + self.offset, vmath.quat_rotation_z(math.rad(angle)), self.bullet_properties)
+end
+
+local function init_turret(self)
+	self.name = turrets[self.index].name;
+	self.max_health = turrets[self.index].max_health;
+	self.health = self.max_health;
+
+	self.fire_rate = 1/turrets[self.index].bullets_per_second;
+	self.time_till_next_bullet = self.fire_rate;
+
+	self.bullet_properties = {};
+	self.bullet_properties.type = turrets[self.index].bullet_type;
+	self.bullet_properties.enemy_bullet = true;
+	self.bullet_properties.damage = turrets[self.index].damage;
+	self.bullet_properties.distance = math.huge;
+	self.bullet_properties.speed = turrets[self.index].speed;
+
+	self.facing_right = (go.get(".", "euler.y") == 180) and true or false
+end
+
+local function change_state(self, state, complete_function)
+	if self.state ~= state then
+		self.state = state;
+		sprite.play_flipbook("#sprite", hash(self.name.."_"..state), complete_function);
+	end
+end
+
+local function die(self)
+	if self.dead then
+		return;
+	end
+
+	self.dead = true;
+	change_state(self, constants.DIE);
+	local angle = self.facing_right and 90 or -90
+	go.animate(".", "euler.z", go.PLAYBACK_ONCE_FORWARD, angle, go.EASING_LINEAR, 0.5, 0, function()
+		go.animate("#sprite", "tint.w", go.PLAYBACK_ONCE_FORWARD, 0, go.EASING_LINEAR, 0.5, 0, function()
+			go.delete();
+			msg.post("/game#game", "enemy_death")
+			msg.post(".", "enemy_death")
+		end)
+	end)
+end
+
+local function take_damage(self, damage)
+	if self.state == constants.HIT then
+		return;
+	end
+	
+	self.health = self.health - damage;
+	self.health = math.max(0, self.health)
+	if self.health == 0 then
+		die(self)
+	else
+		change_state(self, "hit", function()
+			change_state(self, "idle");
+		end)
+	end
+end
+
+function init(self)
+	init_turret(self)
+	change_state(self, constants.IDLE);
+	sprite.set_hflip("#sprite", not self.facing_right)
+end
+
+function update(self, dt)
+	if self.dead or gamestate.get() ~= "PLAY" then
+		return;
+	end
+
+	if self.time_till_next_bullet <= 0 then
+		change_state(self, constants.FIRE, function()
+			change_state(self, constants.IDLE)
+		end)
+
+		local cursor = go.get("#sprite", "cursor")
+		if cursor == (5/8) and self.state == constants.FIRE then
+			fire(self)
+			self.time_till_next_bullet = self.fire_rate
+		end
+	end
+
+	self.time_till_next_bullet = self.time_till_next_bullet - dt;
+end
+
+function on_message(self, message_id, message, sender)
+	if self.dead then return end
+
+	if message_id == constants.COLLISION_RESPONSE then
+		if message.group == constants.BULLET then
+			local damage = go.get(msg.url(nil, message.other_id, "bullet"), "damage");
+			take_damage(self, damage)
+		end
+	end
+end
