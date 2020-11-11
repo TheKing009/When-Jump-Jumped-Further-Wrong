@@ -14,7 +14,6 @@ local CAMERAID = hash("/camera")
 local function spawn_enemy(self, position)
 	local index = math.random(1, 2 + player_data.COMPLETED_LEVELS)
 	local name = enemies[index]
-	print("#"..name.."_factory")
 	collectionfactory.create("#"..name.."_factory", position)
 end
 
@@ -46,7 +45,7 @@ local function on_level_generated(self)
 
 	local turret = level_generator.return_turret_position()
 	if turret then
-		local turret_pos = (turret.position - vmath.vector3(1, 1, 0)) * 32 + vmath.vector3(16, 16, 0);
+		local turret_pos = (turret.position - vmath.vector3(1, 1, 0)) * 32 + vmath.vector3(8, 8, 0);
 		collectionfactory.create("#turret_factory", turret_pos, vmath.quat_rotation_y(turret.left and 0 or math.pi))
 	end
 	
@@ -54,7 +53,7 @@ local function on_level_generated(self)
 	if player_position then
 		go.set_position(player_position * 32, "/player/player")
 	else
-		go.set_position((level_generator.return_random_floor() + vmath.vector3(1, 1, 0)) * 32 + vmath.vector3(16, 16, 0), "/player/player")
+		go.set_position((level_generator.return_random_floor() - vmath.vector3(1, 1, 0)) * 32 + vmath.vector3(16, 16, 0), "/player/player")
 	end
 
 	local door_position = level_generator.return_door_position()

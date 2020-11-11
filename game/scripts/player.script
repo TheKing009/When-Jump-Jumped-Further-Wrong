@@ -10,6 +10,7 @@ local sounds = require "game.modules.sounds"
 
 go.property("speed", 100);
 go.property("max_health", 3);
+go.property("camera", hash("/camera"))
 go.property("shuffle", false);
 go.property("crosshair", false)
 
@@ -79,8 +80,6 @@ local function shuffle_inputs()
 
 	INPUT_MAP.right = temp[1];
 	temp = {}
-
-	msg.post("/gui#hud", "update_keys", {input_map = INPUT_MAP})
 	print(INPUT_MAP.up, INPUT_MAP.left, INPUT_MAP.right, INPUT_MAP.down);
 end
 
@@ -179,6 +178,7 @@ function init(self)
 			sounds.change_keys(function()
 				player_data.SECONDS = player_data.SECONDS + 1;
 				shuffle_inputs()
+				msg.post("/gui#hud", "update_keys", {input_map = INPUT_MAP})
 				msg.post("/gui#hud", "seconds", {seconds = player_data.SECONDS})
 			end)
 		end
@@ -279,7 +279,7 @@ function on_message(self, message_id, message, sender)
 				self.health = self.max_health
 				msg.post("/gui#hud", "update_health", {health = self.health})
 				go.delete(message.other_id)
-				factory.create("#appear_factory",go.get_position(message.other_id), nil, {anim = "collected", a = false})
+				factory.create("/game#appear_factory",go.get_position(message.other_id), nil, {anim = hash("collected"), a = false})
 			end
 		end
 	elseif message_id == constants.ENABLE then

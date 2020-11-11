@@ -78,7 +78,7 @@ function on_input(self, action_id, action)
 
 	if action_id == constants.FIRE_BUTTON and action.released then
 		if self.entered and player_data.NAME == "" then
-			print("clicked")
+
 			player_data.NAME = CHARS[self.index]
 			go.set_position(go.get_position(), "/player/player")
 			msg.post("/player/player", "enable")

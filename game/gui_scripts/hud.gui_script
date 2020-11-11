@@ -20,23 +20,19 @@ local function set_health(self, health)
 	end
 end
 
-local function set_key_wasd(node, key, super)
-	local text = "W"
+local function set_key_wasd(self, key, position)
+	local node;
 	if key == constants.W then
-		text = "W"
-		gui.animate(super, "position", up, gui.EASING_OUTBOUNCE, 0.5)
+		node = self.up
 	elseif key == constants.A then
-		text = "A"
-		gui.animate(super, "position", left, gui.EASING_OUTBOUNCE, 0.5)
+		node = self.left
 	elseif key == constants.S then
-		text = "S"
-		gui.animate(super, "position", right, gui.EASING_OUTBOUNCE, 0.5)
+		node = self.down
 	elseif key == constants.D then
-		text = "D"
-		gui.animate(super, "position", down, gui.EASING_OUTBOUNCE, 0.5)
+		node = self.right
 	end
-	gui.set_scale(node, vmath.vector3(0.75))
-	--gui.set_text(node, text)
+
+	gui.animate(node, "position", position, gui.EASING_OUTBOUNCE, 0.5)
 end
 
 local function set_key_arrows(node, key)
@@ -56,7 +52,12 @@ end
 
 
 function init(self)
+	self.up = gui.get_node("up_box")
+	self.down = gui.get_node("down_box")
+	self.left = gui.get_node("left_box")
+	self.right = gui.get_node("right_box")
 	gui.set_text(gui.get_node("weapon_name"), weapons[player_data.WEAPON].name)
+	
 end
 
 function final(self)
@@ -76,16 +77,16 @@ function on_message(self, message_id, message, sender)
 		set_health(self, message.health)
 	elseif message_id == hash("update_keys") then
 		if game_settings.input_type == constants.WASD then
-			set_key_wasd(gui.get_node("key_left"), message.input_map.left, gui.get_node("left_box"))
-			set_key_wasd(gui.get_node("key_right"), message.input_map.right, gui.get_node("right_box"))
-			set_key_wasd(gui.get_node("key_up"), message.input_map.up, gui.get_node("up_box"))
-			set_key_wasd(gui.get_node("key_down"), message.input_map.down, gui.get_node("down_box"))
+			set_key_wasd(self, message.input_map.left, left)
+			set_key_wasd(self, message.input_map.right, right)
+			set_key_wasd(self, message.input_map.up, up)
+			set_key_wasd(self, message.input_map.down, down)
 		end
 	elseif message_id == hash("change_mission") then
 		gui.set_text(gui.get_node("mission"), "Seek the Door")
 	elseif message_id == hash("seconds") then
 		local s = tostring(message.seconds)
-		gui.set_text(gui.get_node("mission"), "Seconds : "..s)
+		gui.set_text(gui.get_node("ss"), "Seconds : "..s)
 	end
 end
 

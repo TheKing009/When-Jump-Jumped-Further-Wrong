@@ -44,7 +44,7 @@ embedded_instances {
   "  }\n"
   "  properties {\n"
   "    id: \"bullet_per_shot\"\n"
-  "    value: \"2.0\"\n"
+  "    value: \"3.0\"\n"
   "    type: PROPERTY_TYPE_NUMBER\n"
   "  }\n"
   "  properties {\n"
@@ -196,6 +196,6 @@ embedded_instances {
   scale3 {
     x: 0.5
     y: 0.5
-    z: 1.0
+    z: 0.5
   }
 }

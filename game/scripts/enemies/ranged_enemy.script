@@ -18,25 +18,24 @@ go.property("contribute_to_enemies", true)
 local function fire(angle, properties, bullet_per_shot)
 	local offset = vmath.rotate(angle, vmath.vector3(0, 15, 0))
 	if not bullet_per_shot then
-		factory.create("/game#bullet_factory", go.get_world_position() + vmath.vector3(0, 4, -0.1), angle, properties);
+		factory.create("/game#bullet_factory", go.get_world_position() + vmath.vector3(0, 4, -0.1), angle, properties, vmath.vector3(1));
 	else
 		local remainder = bullet_per_shot % 2
 		local range = math.floor(bullet_per_shot / 2)
 		if remainder == 1 then
 			for i = -range, range do
-				factory.create("/game#bullet_factory", go.get_world_position() + vmath.vector3(0, 4, -0.1), angle, properties);
+				factory.create("/game#bullet_factory", go.get_world_position() + vmath.vector3(0, 4, -0.1), angle * vmath.quat_rotation_z(math.rad(i * 20)), properties, vmath.vector3(1));
 			end
 		else
 			range = bullet_per_shot - 1
-			for i = -range, range, -1 do
-				factory.create("/game#bullet_factory", go.get_world_position() + vmath.vector3(0, 4, -0.1), angle, properties);
+			for i = -range, range, 2 do
+				factory.create("/game#bullet_factory", go.get_world_position() + vmath.vector3(0, 4, -0.1), angle * vmath.quat_rotation_z(math.rad(i/2 * 20)), properties, vmath.vector3(1));
 			end
 		end
 	end
 end
 
 local function init_enemy(self)
-	pprint(self.index)
 	self.name = enemies[self.index];
 	self.health = self.max_health
 

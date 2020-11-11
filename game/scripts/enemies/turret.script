@@ -26,7 +26,8 @@ local function init_turret(self)
 	self.bullet_properties.distance = math.huge;
 	self.bullet_properties.speed = turrets[self.index].speed;
 
-	self.facing_right = (go.get(".", "euler.y") == 180) and true or false
+	local angle = go.get(".", "euler.y")
+	self.facing_right = angle == 180 and true or false
 end
 
 local function change_state(self, state, complete_function)
@@ -72,7 +73,6 @@ end
 function init(self)
 	init_turret(self)
 	change_state(self, constants.IDLE);
-	sprite.set_hflip("#sprite", not self.facing_right)
 end
 
 function update(self, dt)

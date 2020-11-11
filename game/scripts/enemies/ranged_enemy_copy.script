@@ -32,7 +32,6 @@ local function fire(angle, properties, bullet_per_shot)
 end
 
 local function init_enemy(self)
-	pprint(self.index)
 	self.name = enemies[self.index].name;
 	self.max_health = enemies[self.index].max_health;
 	self.health = enemies[self.index].max_health;

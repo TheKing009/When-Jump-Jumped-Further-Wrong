@@ -1,6 +1,6 @@
 name: "shop"
 instances {
-  id: "camera"
+  id: "weapon_camera"
   prototype: "/orthographic/camera.go"
   position {
     x: 0.0
@@ -100,6 +100,11 @@ collection_instances {
     id: "player"
     properties {
       id: "player"
+      properties {
+        id: "camera"
+        value: "/weapon_camera"
+        type: PROPERTY_TYPE_HASH
+      }
       properties {
         id: "shuffle"
         value: "false"
@@ -953,7 +958,7 @@ embedded_instances {
   id: "table1"
   data: "components {\n"
   "  id: \"table\"\n"
-  "  component: \"/assets/tilemap/table.tilemap\"\n"
+  "  component: \"/assets/tilemap/table2.tilemap\"\n"
   "  position {\n"
   "    x: 0.0\n"
   "    y: 0.0\n"
@@ -969,7 +974,7 @@ embedded_instances {
   "embedded_components {\n"
   "  id: \"collisionobject\"\n"
   "  type: \"collisionobject\"\n"
-  "  data: \"collision_shape: \\\"/assets/tilemap/table.tilemap\\\"\\n"
+  "  data: \"collision_shape: \\\"/assets/tilemap/table2.tilemap\\\"\\n"
   "type: COLLISION_OBJECT_TYPE_KINEMATIC\\n"
   "mass: 0.0\\n"
   "friction: 0.1\\n"
@@ -995,15 +1000,15 @@ embedded_instances {
   "}\n"
   ""
   position {
-    x: 209.0
+    x: 50.0
     y: 31.0
     z: 0.1
   }
   rotation {
     x: 0.0
-    y: 1.0
+    y: 0.0
     z: 0.0
-    w: 6.123234E-17
+    w: 1.0
   }
   scale3 {
     x: 0.5

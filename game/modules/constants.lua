@@ -12,7 +12,7 @@ M.D = hash("key_d");
 M.FIRE_BUTTON = hash("mouse_button_left");
 M.ROLL_BUTTON = hash("mouse_button_right")
 
-M.IN_GAME_SEC = 5;
+M.IN_GAME_SEC = 10;
 
 M.ARROW = hash("arrow");
 M.WASD = hash("wasd");

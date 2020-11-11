@@ -138,7 +138,6 @@ local function clean(on_generated)
 			if is_floor then
 				local vector = vmath.vector3(i, j, 0);
 				local diff = M.PLAYER_POSITION - vector
-				print(diff)
 				local distance_sqr = vmath.length_sqr(diff)
 				if distance_sqr >= 9 then
 					table.insert(FLOOR_MAP, vmath.vector3(i, j, 0))
